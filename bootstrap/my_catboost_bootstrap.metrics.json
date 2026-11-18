@@ -1,0 +1,13 @@
+{
+  "version": "bootstrap",
+  "role": "bootstrap",
+  "published": true,
+  "train_rows": 76593,
+  "test_rows": 53328,
+  "test_month": "2019-03",
+  "roc_auc": 0.965789951409907,
+  "f1": 0.2520152736529487,
+  "iterations": 30,
+  "depth": 3,
+  "learning_rate": 0.1
+}

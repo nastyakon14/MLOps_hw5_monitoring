@@ -1,0 +1,178 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: scoring-service
+    folder: Fraud alerts
+    interval: 10s
+    rules:
+      - uid: fraud-share-high
+        title: Доля фрода выше порога
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: fraud_scorer_fraud_share
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.02
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 20s
+        annotations:
+          summary: Доля фрода на скоринге больше 2%.
+          description: "Текущая доля помеченных транзакций {{ $values.A }} при пороге 0.02. Чтобы проверить срабатывание, понизьте порог в этом файле до 0.0001 и перезапустите Grafana."
+        labels:
+          severity: warning
+          service: fraud_detector
+        isPaused: false
+
+      - uid: scoring-stream-stopped
+        title: Поток скоринга остановился
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: rate(fraud_scorer_processed_total[30s])
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 45s
+        annotations:
+          summary: Скоринг почти не обрабатывает транзакции.
+          description: "rate(fraud_scorer_processed_total[30s]) ниже 0.1 TPS дольше 45 секунд. Проверка: docker compose stop transaction_simulator."
+        labels:
+          severity: critical
+          service: fraud_detector
+        isPaused: false
+
+      - uid: scoring-latency-high
+        title: Время обработки транзакции выросло
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: rate(fraud_scorer_latency_seconds_sum[30s]) / rate(fraud_scorer_latency_seconds_count[30s])
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.5
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 30s
+        annotations:
+          summary: Среднее время скоринга больше 0.5 с.
+          description: Алерт на метрике fraud_scorer_latency_seconds. Срабатывает, если инференс деградировал.
+        labels:
+          severity: warning
+          service: fraud_detector
+        isPaused: false
